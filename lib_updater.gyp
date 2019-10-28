@@ -56,6 +56,13 @@
         'zlibstat',
         'LzmaLib',
       ],
+    }, {
+      'include_dirs': [
+        '/usr/local/include',
+      ],
+      'library_dirs': [
+        '/usr/local/lib',
+      ],
     }], [ 'build_linux', {
       'libraries': [
         '<(linux_lib_ssl)',
