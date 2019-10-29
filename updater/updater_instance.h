@@ -40,7 +40,18 @@ struct Settings {
 	TimeId delayRandPart = 0;
 };
 
-int Install(const QStringList &arguments);
+// Windows only.
+struct InfoForRegistry {
+	QString guid;
+	QString fullName;
+	QString publisher;
+	QString iconGroup;
+	QString helpLink;
+	QString supportLink;
+	QString updateLink;
+};
+
+int Install(const QStringList &arguments, const InfoForRegistry &info);
 
 class Instance final : public base::has_weak_ptr {
 public:

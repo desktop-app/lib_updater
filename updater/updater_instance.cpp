@@ -35,8 +35,8 @@ using namespace details;
 
 } // namespace
 
-int Install(const QStringList &arguments) {
-	return details::Install(arguments);
+int Install(const QStringList &arguments, const InfoForRegistry &info) {
+	return details::Install(arguments, info);
 }
 
 Instance::Instance(const Settings &settings, int currentVersion)

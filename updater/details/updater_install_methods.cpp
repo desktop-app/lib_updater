@@ -6,6 +6,7 @@
 //
 #include "updater/details/updater_install_methods.h"
 
+#include "updater/updater_instance.h"
 #include "base/integration.h"
 #include "base/platform/base_platform_file_utilities.h"
 
@@ -30,6 +31,14 @@ namespace {
 	f.remove();
 
 	return !good;
+}
+
+[[nodiscard]] int ReadVersion(const QString &path) {
+	auto f = QFile(path);
+	const auto content = f.open(QIODevice::ReadOnly)
+		? f.readAll()
+		: QByteArray();
+	return QString::fromLatin1(content).toInt();
 }
 
 #ifdef Q_OS_WIN
@@ -146,6 +155,59 @@ bool LaunchAsNormalUser(
 	return true;
 }
 
+bool UpdateRegistry(const InfoForRegistry &info, int version) {
+	auto rkey = HKEY();
+	const auto path = ("Software\\Microsoft\\Windows\\CurrentVersion\\"
+		"Uninstall\\{" + info.guid + "}_is1").toStdWString();
+	const auto status = RegOpenKeyEx(
+		HKEY_CURRENT_USER,
+		path.c_str(),
+		0,
+		KEY_QUERY_VALUE | KEY_SET_VALUE,
+		&rkey);
+	if (status != ERROR_SUCCESS) {
+		return false;
+	}
+	const auto major = version / 1000000;
+	const auto minor = (version % 1000000) / 1000;
+	const auto patch = version % 1000;
+	const auto versionString = patch
+		? QString("%1.%2.%3").arg(major).arg(minor).arg(patch)
+		: QString("%1.%2").arg(major).arg(minor);
+	auto stLocalTime = SYSTEMTIME();
+	GetLocalTime(&stLocalTime);
+
+	const auto wideVersion = versionString.toStdWString();
+	const auto wideName = (info.fullName + " version ").toStdWString()
+		+ wideVersion;
+	const auto widePublisher = info.publisher.toStdWString();
+	const auto wideIconGroup = info.iconGroup.toStdWString();
+	const auto wideDate = QString("%1%2%3"
+	).arg(stLocalTime.wYear, 4, 10, QChar('0')
+	).arg(stLocalTime.wMonth, 2, 10, QChar('0')
+	).arg(stLocalTime.wDay, 2, 10, QChar('0')).toStdWString();
+	const auto wideHelpLink = info.helpLink.toStdWString();
+	const auto wideSupportLink = info.supportLink.toStdWString();
+	const auto wideUpdateLink = info.updateLink.toStdWString();
+
+	const auto set = [&](const wchar_t *name, const std::wstring &value) {
+		auto bytes = std::vector<BYTE>((value.size() + 1) * 2, 0);
+		memcpy(bytes.data(), value.c_str(), bytes.size());
+		RegSetValueEx(rkey, name, 0, REG_SZ, bytes.data(), bytes.size());
+	};
+	set(L"DisplayVersion", wideVersion);
+	set(L"DisplayName", wideName);
+	set(L"Publisher", widePublisher);
+	set(L"Inno Setup: Icon Group", wideIconGroup);
+	set(L"InstallDate", wideDate);
+	set(L"HelpLink", wideHelpLink);
+	set(L"URLInfoAbout", wideSupportLink);
+	set(L"URLUpdateInfo", wideUpdateLink);
+
+	RegCloseKey(rkey);
+	return true;
+}
+
 #else // Q_OS_WIN
 
 bool CopyWithOverwrite(const QString &src, const QString &dst) {
@@ -217,6 +279,9 @@ bool LaunchAsNormalUser(
 	return Launch(path, arguments, false);
 }
 
+void UpdateRegistry(const InfoForRegistry &info, int version) {
+}
+
 #endif // Q_OS_WIN
 
 struct InstallArguments {
@@ -252,6 +317,53 @@ struct InstallArguments {
 		(values["--writeprotected"] == "1"),
 		relaunchArguments
 	};
+}
+
+[[nodiscard]] bool ResolvePaths(QFileInfoList &list) {
+	auto hasDirectories = bool();
+	do {
+		hasDirectories = false;
+		for (auto i = list.begin(); i != list.end(); ++i) {
+			const auto info = *i;
+			if (info.isDir()) {
+				hasDirectories = true;
+				list.erase(i);
+				const auto directory = QDir(info.absoluteFilePath());
+				const auto mask = QDir::Files
+					| QDir::Dirs
+					| QDir::NoSymLinks
+					| QDir::NoDotAndDotDot;
+				list.append(directory.entryInfoList(mask));
+				break;
+			} else if (!info.isReadable()) {
+				return false;
+			}
+		}
+	} while (hasDirectories);
+	return true;
+}
+
+[[nodiscard]] std::map<QString, QString> CollectCopyRequests(
+		const InstallArguments &values) {
+	const auto base = values.source;
+	const auto self = values.self;
+	auto list = QFileInfoList() << QFileInfo(base);
+	if (!ResolvePaths(list)) {
+		return {};
+	}
+	auto result = std::map<QString, QString>();
+	for (const auto &entry : list) {
+		const auto path = entry.absoluteFilePath();
+		if (!path.startsWith(base, Qt::CaseInsensitive)) {
+			return {};
+		}
+		const auto relative = path.mid(base.size());
+		const auto target = relative.startsWith(self, Qt::CaseInsensitive)
+			? (values.target + values.executable + relative.mid(self.size()))
+			: (values.target + relative);
+		result[path] = target;
+	}
+	return result;
 }
 
 } // namespace
@@ -301,31 +413,7 @@ bool Restart(
 		writeProtected);
 }
 
-[[nodiscard]] bool ResolvePaths(QFileInfoList &list) {
-	auto hasDirectories = bool();
-	do {
-		hasDirectories = false;
-		for (auto i = list.begin(); i != list.end(); ++i) {
-			const auto info = *i;
-			if (info.isDir()) {
-				hasDirectories = true;
-				list.erase(i);
-				const auto directory = QDir(info.absoluteFilePath());
-				const auto mask = QDir::Files
-					| QDir::Dirs
-					| QDir::NoSymLinks
-					| QDir::NoDotAndDotDot;
-				list.append(directory.entryInfoList(mask));
-				break;
-			} else if (!info.isReadable()) {
-				return false;
-			}
-		}
-	} while (hasDirectories);
-	return true;
-}
-
-int Install(const QStringList &arguments) {
+int Install(const QStringList &arguments, const InfoForRegistry &info) {
 	const auto values = ParseInstallArguments(arguments);
 	if (values.executable.isEmpty()
 		|| values.self.isEmpty()
@@ -333,33 +421,18 @@ int Install(const QStringList &arguments) {
 		|| values.target.isEmpty()) {
 		return -1;
 	}
+	const auto version = ReadVersion(values.source + "_update_version.tmp");
 	QFile(values.source + "ready").remove();
 	QFile(values.source + "_update_version.tmp").remove();
 
-	const auto base = values.source;
-	const auto self = values.self;
-	auto list = QFileInfoList() << QFileInfo(base);
-	if (!ResolvePaths(list)) {
-		return -1;
-	}
-
-	std::map<QString, QString> copies;
-	for (const auto &entry : list) {
-		const auto path = entry.absoluteFilePath();
-		if (!path.startsWith(base, Qt::CaseInsensitive)) {
-			return -1;
-		}
-		const auto relative = path.mid(base.size());
-		const auto target = relative.startsWith(self, Qt::CaseInsensitive)
-			? (values.target + values.executable + relative.mid(self.size()))
-			: (values.target + relative);
-		copies[path] = target;
-	}
-
+	const auto copies = CollectCopyRequests(values);
 	for (const auto &[src, dst] : copies) {
 		if (!CopyWithOverwrite(src, dst)) {
 			return -1;
 		}
+	}
+	if (version > 0) {
+		UpdateRegistry(info, version);
 	}
 
 	const auto path = values.target + values.executable;

@@ -6,6 +6,10 @@
 //
 #pragma once
 
+namespace Updater {
+struct InfoForRegistry;
+} // namespace Updater
+
 namespace Updater::details {
 
 bool Restart(
@@ -13,6 +17,6 @@ bool Restart(
 	QString canonicalExecutableName,
 	QStringList relaunchArguments);
 
-int Install(const QStringList &arguments);
+int Install(const QStringList &arguments, const InfoForRegistry &info);
 
 } // namespace Updater::details

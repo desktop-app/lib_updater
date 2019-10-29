@@ -179,12 +179,6 @@ constexpr auto kPrivateKeySize = 256;
 [[nodiscard]] bool WriteVersionFile(
 		const QString &basePath,
 		quint32 version) {
-	//const auto major = version / 1000000;
-	//const auto minor = (version % 1000000) / 1000;
-	//const auto patch = version % 1000;
-	//const auto versionString = patch
-	//	? QString("%1.%2.%3").arg(major).arg(minor).arg(patch)
-	//	: QString("%1.%2").arg(major).arg(minor);
 	const auto content = QString::number(version).toLatin1();
 	auto f = QFile(basePath + "_update_version.tmp");
 	return f.open(QIODevice::WriteOnly)
