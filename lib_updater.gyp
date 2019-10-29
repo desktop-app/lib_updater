@@ -167,19 +167,5 @@
         }]],
       },
     },
-  }, {
-    'target_name': 'update_installer',
-    'variables': {
-      'src_loc': '.',
-      'mac_target': '10.12',
-      'private_name%': '',
-      'public_key_loc%': '',
-    },
-    'includes': [
-      '../gyp/helpers/common/executable.gypi',
-    ],
-    'sources': [
-      '<(src_loc)/updater/installer/updater_update_installer.m',
-    ],
   }],
 }
