@@ -221,11 +221,8 @@ bool CopyWithOverwrite(const QString &src, const QString &dst) {
 	QDir().mkpath(QFileInfo(dst).absolutePath());
 	QFile(dst).remove();
 	if (QFile(src).rename(dst)) {
-		std::cout << "Renamed!.." << std::endl;
 		return true;
 	}
-
-	std::cout << "Copy with overwrite :(.." << std::endl;
 
 	const auto from = QFile::encodeName(src).toStdString();
 	const auto to = QFile::encodeName(dst).toStdString();
@@ -280,16 +277,9 @@ bool Launch(
 	base::Platform::RemoveQuarantine(path);
 #endif // Q_OS_MAC
 
-	std::cout << "Will launch:" << std::endl;
-	std::cout << path.toStdString() << std::endl;
-	std::cout << "Arguments:" << std::endl;
-	for (const auto &argument : arguments) {
-		std::cout << argument.toStdString() << std::endl;
-	}
 	auto process = QProcess();
 	process.setProgram(path);
 	process.setArguments(arguments);
-	std::cout << "Starting!" << std::endl;
 	return process.startDetached();
 }
 
@@ -387,8 +377,6 @@ struct InstallArguments {
 			? (values.target + values.executable + relative.mid(canonical.size()))
 			: (values.target + relative);
 		result[path] = target;
-		std::cout << path.toStdString() << " ->" << std::endl;
-		std::cout << "-> " << target.toStdString() << std::endl;
 	}
 	return result;
 }
@@ -483,7 +471,6 @@ int Install(const QStringList &arguments, const InfoForRegistry &info) {
 	const auto relaunched = values.writeProtected
 		? LaunchAsNormalUser(values.source, launchPath, values.relaunchArguments)
 		: Launch(launchPath, values.relaunchArguments, false);
-	std::cout << "Result: " << (relaunched ? 0 : -1) << std::endl;
 	return relaunched ? 0 : -1;
 }
 
