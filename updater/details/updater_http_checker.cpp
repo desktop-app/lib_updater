@@ -204,7 +204,7 @@ std::optional<HttpChecker::ParsedVersion> HttpChecker::parseResponse(
 		"{version}",
 		QString::number(bestAvailableVersion));
 	if (bestAvailableVersion <= _instance->currentVersion()) {
-		return std::nullopt;
+		return ParsedVersion{ QString(), 0 };
 	}
 	return ParsedVersion{ result, bestAvailableVersion };
 }

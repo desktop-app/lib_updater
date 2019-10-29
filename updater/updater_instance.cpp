@@ -87,7 +87,7 @@ rpl::producer<> Instance::ready() const {
 }
 
 void Instance::check() {
-	start(false);
+	start(Start::Normal);
 }
 
 void Instance::updateLastCheckTime() {
@@ -157,7 +157,7 @@ void Instance::handleProgress() {
 void Instance::scheduleNext() {
 	stop();
 	updateLastCheckTime();
-	start(true);
+	start(Start::Wait);
 }
 
 auto Instance::state() const -> State {
@@ -183,7 +183,15 @@ void Instance::stop() {
 	_action = Action::Waiting;
 }
 
-void Instance::start(bool forceWait) {
+void Instance::cancel() {
+	stop();
+	QFile(unpackPath() + "ready").remove();
+	if (const auto name = findUpdateFile(); !name.isEmpty()) {
+		QFile(name).remove();
+	}
+}
+
+void Instance::start(Start type) {
 	if (base::Integration::Instance().executablePath().isEmpty()) {
 		return;
 	}
@@ -191,6 +199,8 @@ void Instance::start(bool forceWait) {
 	_timer.cancel();
 	if (_action != Action::Waiting) {
 		return;
+	} else if (type == Start::Now) {
+		_lastCheckTime = 0;
 	}
 
 	_retryTimer.cancel();
@@ -202,7 +212,7 @@ void Instance::start(bool forceWait) {
 		- base::unixtime::now();
 	auto sendRequest = (updateInSecs <= 0)
 		|| (updateInSecs > constDelay + randDelay);
-	if (!sendRequest && !forceWait && !findUpdateFile().isEmpty()) {
+	if (!sendRequest && type != Start::Wait && !findUpdateFile().isEmpty()) {
 		sendRequest = true;
 	}
 
@@ -268,8 +278,7 @@ void Instance::checkerFail(not_null<Implementation*> which) {
 
 void Instance::test() {
 	_testing = true;
-	_lastCheckTime = 0;
-	start(false);
+	start(Start::Now);
 }
 
 void Instance::handleTimeout() {

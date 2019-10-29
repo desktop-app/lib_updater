@@ -64,8 +64,14 @@ public:
 	[[nodiscard]] rpl::producer<> failed() const;
 	[[nodiscard]] rpl::producer<> ready() const;
 
-	void start(bool forceWait);
+	enum class Start {
+		Now,
+		Normal,
+		Wait,
+	};
+	void start(Start type);
 	void stop();
+	void cancel();
 	void test();
 
 	[[nodiscard]] State state() const;
