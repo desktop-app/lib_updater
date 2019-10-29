@@ -84,7 +84,7 @@
       }], [ 'build_mac', {
         'xcode_settings': {
           'OTHER_LDFLAGS': [
-            '-llzma',
+            '/usr/local/lib/liblzma.a',
           ],
         },
       }]],
@@ -138,7 +138,7 @@
     }], [ 'build_mac', {
       'xcode_settings': {
         'OTHER_LDFLAGS': [
-          '-llzma',
+          '/usr/local/lib/liblzma.a',
         ],
       },
     }]],
