@@ -4,5 +4,12 @@
 // For license and copyright information please follow this link:
 // https://github.com/desktop-app/legal/blob/master/LEGAL
 //
-#include "updater/updater_checker.h"
 
+#include <QtCore/QString>
+
+#include "base/algorithm.h"
+#include "base/basic_types.h"
+#include "base/weak_ptr.h"
+
+#include <rpl/rpl.h>
+#include <crl/crl.h>

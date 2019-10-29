@@ -6,8 +6,11 @@
 //
 #pragma once
 
-namespace Updater {
+namespace Updater::details {
 
-class Checker;
+[[nodiscard]] bool Unpack(
+	const QString &basePath,
+	const QString &filePath,
+	quint32 currentVersion);
 
-} // namespace Updater
+} // namespace Updater::details

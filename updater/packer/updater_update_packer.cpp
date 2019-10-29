@@ -138,9 +138,10 @@ struct Data {
 
 QDataStream &operator<<(QDataStream &stream, const Data &data) {
 	auto flags = quint32();
-	stream << flags;
-	stream << quint32(data.version);
-	stream << quint32(data.files.size());
+	stream
+		<< flags
+		<< quint32(data.version)
+		<< quint32(data.files.size());
 	cout
 		<< "Found "
 		<< data.files.size()
@@ -177,10 +178,7 @@ QDataStream &operator<<(QDataStream &stream, const Data &data) {
 		if (info.isExecutable()) {
 			flags |= 0x01U;
 		}
-		stream
-			<< name
-			<< flags
-			<< content;
+		stream << name << flags << content;
 	}
 	return stream;
 }
