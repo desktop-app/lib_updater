@@ -32,9 +32,20 @@
     ],
     'include_dirs': [
       '<(src_loc)',
-      '<(libs_loc)/lzma/C',
       '<(public_key_loc)',
     ],
+    'conditions': [[ 'build_win', {
+      'include_dirs': [
+        '<(libs_loc)/lzma/C',
+      ],
+    }, {
+      'include_dirs': [
+        '/usr/local/include',
+      ],
+      'library_dirs': [
+        '/usr/local/lib',
+      ],
+    }]],
     'direct_dependent_settings': {
       'include_dirs': [
         '<(src_loc)',

@@ -12,6 +12,7 @@
 
 #include <QtCore/QJsonObject>
 #include <QtCore/QJsonDocument>
+#include <cmath>
 
 namespace Updater::details {
 namespace {

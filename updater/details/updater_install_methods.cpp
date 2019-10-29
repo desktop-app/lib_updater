@@ -14,11 +14,18 @@
 #include <QtCore/QProcess>
 
 #ifdef Q_OS_WIN
-#include "base/platform/win/base_windows_h.h"
 
+#include "base/platform/win/base_windows_h.h"
 #include <Shellapi.h>
 #include <Shlwapi.h>
 #include <ShlObj.h>
+
+#else // Q_OS_WIN
+
+#include <sys/stat.h>
+#include <unistd.h>
+#include <iostream>
+
 #endif // Q_OS_WIN
 
 namespace Updater::details {
@@ -212,6 +219,13 @@ bool UpdateRegistry(const InfoForRegistry &info, int version) {
 
 bool CopyWithOverwrite(const QString &src, const QString &dst) {
 	QDir().mkpath(QFileInfo(dst).absolutePath());
+	QFile(dst).remove();
+	if (QFile(src).rename(dst)) {
+		std::cout << "Renamed!.." << std::endl;
+		return true;
+	}
+
+	std::cout << "Copy with overwrite :(.." << std::endl;
 
 	const auto from = QFile::encodeName(src).toStdString();
 	const auto to = QFile::encodeName(dst).toStdString();
@@ -266,9 +280,16 @@ bool Launch(
 	base::Platform::RemoveQuarantine(path);
 #endif // Q_OS_MAC
 
+	std::cout << "Will launch:" << std::endl;
+	std::cout << path.toStdString() << std::endl;
+	std::cout << "Arguments:" << std::endl;
+	for (const auto &argument : arguments) {
+		std::cout << argument.toStdString() << std::endl;
+	}
 	auto process = QProcess();
 	process.setProgram(path);
 	process.setArguments(arguments);
+	std::cout << "Starting!" << std::endl;
 	return process.startDetached();
 }
 
@@ -346,7 +367,11 @@ struct InstallArguments {
 [[nodiscard]] std::map<QString, QString> CollectCopyRequests(
 		const InstallArguments &values) {
 	const auto base = values.source;
-	const auto self = values.self;
+#ifdef Q_OS_MAC
+	const auto canonical = values.self + ".app";
+#else // Q_OS_MAC
+	const auto canonical = values.self;
+#endif // Q_OS_MAC
 	auto list = QFileInfoList() << QFileInfo(base);
 	if (!ResolvePaths(list)) {
 		return {};
@@ -358,10 +383,12 @@ struct InstallArguments {
 			return {};
 		}
 		const auto relative = path.mid(base.size());
-		const auto target = relative.startsWith(self, Qt::CaseInsensitive)
-			? (values.target + values.executable + relative.mid(self.size()))
+		const auto target = relative.startsWith(canonical, Qt::CaseInsensitive)
+			? (values.target + values.executable + relative.mid(canonical.size()))
 			: (values.target + relative);
 		result[path] = target;
+		std::cout << path.toStdString() << " ->" << std::endl;
+		std::cout << "-> " << target.toStdString() << std::endl;
 	}
 	return result;
 }
@@ -372,24 +399,30 @@ bool Restart(
 		const QString &source,
 		QString canonicalExecutableName,
 		QStringList relaunchArguments) {
+	const auto ready = source + "ready";
 	const auto target = base::Integration::Instance().executableDir();
 	const auto executable = base::Integration::Instance().executableName();
 	if (target.isEmpty() || executable.isEmpty()) {
+		QFile(ready).remove();
 		return false;
 	}
 #ifdef Q_OS_WIN
 	canonicalExecutableName += ".exe";
-#elif defined Q_OS_MAC // Q_OS_WIN
-	canonicalExecutableName += ".app";
 #endif // Q_OS_WIN || Q_OS_MAC
+
 	const auto fullPath = source + canonicalExecutableName;
-	if (!QFile(fullPath).exists()) {
+
+#ifdef Q_OS_MAC
+	const auto innerPath = ".app/Contents/MacOS/" + canonicalExecutableName;
+	const auto launchPath = fullPath + innerPath;
+#else // Q_OS_MAC
+	const auto launchPath = fullPath;
+#endif // Q_OS_MAC
+
+	if (!QFile(launchPath).exists()) {
+		QFile(ready).remove();
 		return false;
 	}
-	const auto launchPath = fullPath;
-#ifdef Q_OS_MAC
-	const auto launchPath = fullPath + "/Contents/Helpers/update_installer";
-#endif // Q_OS_MAC
 
 	const auto writeProtected = IsWriteProtected(target);
 	auto arguments = QStringList()
@@ -426,6 +459,11 @@ int Install(const QStringList &arguments, const InfoForRegistry &info) {
 	QFile(values.source + "_update_version.tmp").remove();
 
 	const auto copies = CollectCopyRequests(values);
+
+#ifdef Q_OS_MAC
+	base::Platform::DeleteDirectory(values.target + values.executable + "/Contents");
+#endif // Q_OS_MAC
+
 	for (const auto &[src, dst] : copies) {
 		if (!CopyWithOverwrite(src, dst)) {
 			return -1;
@@ -435,10 +473,17 @@ int Install(const QStringList &arguments, const InfoForRegistry &info) {
 		UpdateRegistry(info, version);
 	}
 
-	const auto path = values.target + values.executable;
+	const auto fullPath = values.target + values.executable;
+#ifdef Q_OS_MAC
+	const auto innerPath = "/Contents/MacOS/" + values.self;
+	const auto launchPath = fullPath + innerPath;
+#else // Q_OS_MAC
+	const auto launchPath = fullPath;
+#endif // Q_OS_MAC
 	const auto relaunched = values.writeProtected
-		? LaunchAsNormalUser(values.source, path, values.relaunchArguments)
-		: Launch(path, values.relaunchArguments, false);
+		? LaunchAsNormalUser(values.source, launchPath, values.relaunchArguments)
+		: Launch(launchPath, values.relaunchArguments, false);
+	std::cout << "Result: " << (relaunched ? 0 : -1) << std::endl;
 	return relaunched ? 0 : -1;
 }
 

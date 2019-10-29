@@ -42,6 +42,7 @@ constexpr auto kPrivateKeySize = 256;
 	if (memcmp(counted.data(), data.data() + size, kHashSize) != 0) {
 		return false;
 	}
+	data.resize(size);
 	return true;
 }
 
@@ -89,7 +90,7 @@ constexpr auto kPrivateKeySize = 256;
 		return false;
 	}
 
-	data.resize(data.size() - kSignatureSize);
+	data.resize(size);
 	return true;
 }
 

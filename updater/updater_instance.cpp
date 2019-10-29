@@ -22,7 +22,6 @@
 #include <QtCore/QDir>
 #include <QtCore/QMutex>
 #include <QtCore/QRegularExpression>
-#include <QtCore/QProcess>
 #include <QtNetwork/QNetworkReply>
 #include <QtNetwork/QNetworkAccessManager>
 
