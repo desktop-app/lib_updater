@@ -212,7 +212,8 @@ constexpr auto kPrivateKeySize = 256;
 		if (stream.status() != QDataStream::Ok || name.indexOf("..") >= 0) {
 			return false;
 		}
-		auto f = QFile(basePath + name);
+		const auto path = basePath + name;
+		auto f = QFile(path);
 		if (!QDir().mkpath(QFileInfo(f).absolutePath())) {
 			return false;
 		} else if (!f.open(QIODevice::WriteOnly)) {
@@ -229,6 +230,7 @@ constexpr auto kPrivateKeySize = 256;
 				| QFileDevice::ExeGroup
 				| QFileDevice::ExeOther);
 		}
+		base::Platform::RemoveQuarantine(path);
 	}
 	return WriteVersionFile(basePath, version);
 }

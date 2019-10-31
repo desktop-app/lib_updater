@@ -273,9 +273,7 @@ bool Launch(
 		const QString &path,
 		const QStringList &arguments,
 		bool runElevated) {
-#ifdef Q_OS_MAC
 	base::Platform::RemoveQuarantine(path);
-#endif // Q_OS_MAC
 
 	auto process = QProcess();
 	process.setProgram(path);
