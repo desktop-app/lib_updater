@@ -220,53 +220,37 @@ bool UpdateRegistry(const InfoForRegistry &info, int version) {
 bool CopyWithOverwrite(const QString &src, const QString &dst) {
 	QDir().mkpath(QFileInfo(dst).absolutePath());
 	QFile(dst).remove();
-	if (QFile(src).rename(dst)) {
-		return true;
-	}
 
 	const auto from = QFile::encodeName(src).toStdString();
 	const auto to = QFile::encodeName(dst).toStdString();
-	const auto ffrom = fopen(from.c_str(), "rb");
-	const auto fto = fopen(to.c_str(), "wb");
-	if (!ffrom) {
-		if (fto) fclose(fto);
-		return false;
-	}
-	if (!fto) {
-		fclose(ffrom);
-		return false;
-	}
-	static const int BufSize = 65536;
-	char buf[BufSize];
-	while (size_t size = fread(buf, 1, BufSize, ffrom)) {
-		fwrite(buf, 1, size, fto);
-	}
 
 	// From http://stackoverflow.com/questions/5486774/keeping-fileowner-and-permissions-after-copying-file-in-c
 	struct stat fst;
-	//let's say this wont fail since you already worked OK on that fp
-	if (fstat(fileno(ffrom), &fst) != 0) {
-		fclose(ffrom);
-		fclose(fto);
+	if (stat(from.c_str(), &fst) != 0) {
 		return false;
 	}
-	//update to the same uid/gid
-	if (fchown(fileno(fto), fst.st_uid, fst.st_gid) != 0) {
-		fclose(ffrom);
-		fclose(fto);
-		return false;
+	if (!QFile(src).rename(dst)) {
+		const auto ffrom = fopen(from.c_str(), "rb");
+		const auto fto = fopen(to.c_str(), "wb");
+		const auto guard = gsl::finally([&] {
+			if (ffrom) {
+				fclose(ffrom);
+			}
+			if (fto) {
+				fclose(fto);
+			}
+		});
+		if (!ffrom || !fto) {
+			return false;
+		}
+		constexpr auto kBufferSize = 65536;
+		char buf[kBufferSize];
+		while (size_t size = fread(buf, 1, kBufferSize, ffrom)) {
+			fwrite(buf, 1, size, fto);
+		}
 	}
-	//update the permissions
-	if (fchmod(fileno(fto), fst.st_mode) != 0) {
-		fclose(ffrom);
-		fclose(fto);
-		return false;
-	}
-
-	fclose(ffrom);
-	fclose(fto);
-
-	return true;
+	return (chown(to.c_str(), fst.st_uid, fst.st_gid) == 0)
+		&& (chmod(to.c_str(), fst.st_mode) == 0);
 }
 
 bool Launch(
