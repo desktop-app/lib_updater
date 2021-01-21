@@ -7,6 +7,7 @@
 #include "updater/details/updater_http_checker.h"
 
 #include "base/platform/base_platform_info.h"
+#include "base/qt_adapters.h"
 #include "updater/details/updater_http_loader.h"
 #include "updater/updater_instance.h"
 
@@ -18,9 +19,6 @@ namespace Updater::details {
 namespace {
 
 constexpr auto kMaxResponseSize = 1024 * 1024;
-
-using ErrorSignal = void(QNetworkReply::*)(QNetworkReply::NetworkError);
-const auto QNetworkReply_error = ErrorSignal(&QNetworkReply::error);
 
 template <typename Callback>
 bool ParseCommonMap(
@@ -119,7 +117,7 @@ void HttpChecker::start() {
 	_reply->connect(_reply, &QNetworkReply::finished, [=] {
 		gotResponse();
 	});
-	_reply->connect(_reply, QNetworkReply_error, [=](auto e) {
+	_reply->connect(_reply, base::QNetworkReply_error, [=](auto e) {
 		gotFailure(e);
 	});
 }
@@ -166,7 +164,7 @@ void HttpChecker::clearSentRequest() {
 		return;
 	}
 	reply->disconnect(reply, &QNetworkReply::finished, nullptr, nullptr);
-	reply->disconnect(reply, QNetworkReply_error, nullptr, nullptr);
+	reply->disconnect(reply, base::QNetworkReply_error, nullptr, nullptr);
 	reply->abort();
 	reply->deleteLater();
 	_manager = nullptr;

@@ -7,18 +7,13 @@
 #include "updater/details/updater_http_loader.h"
 
 #include "base/basic_types.h"
+#include "base/qt_adapters.h"
 #include <QtCore/QString>
 #include <QtCore/QRegularExpression>
 #include <QtNetwork/QNetworkAccessManager>
 #include <QtNetwork/QNetworkReply>
 
 namespace Updater::details {
-namespace {
-
-using ErrorSignal = void(QNetworkReply::*)(QNetworkReply::NetworkError);
-const auto QNetworkReply_error = ErrorSignal(&QNetworkReply::error);
-
-} // namespace
 
 class HttpLoaderActor : public QObject {
 public:
@@ -75,7 +70,7 @@ void HttpLoaderActor::sendRequest() {
 		&HttpLoaderActor::partFinished);
 	connect(
 		_reply.get(),
-		QNetworkReply_error,
+		base::QNetworkReply_error,
 		this,
 		&HttpLoaderActor::partFailed);
 	connect(
